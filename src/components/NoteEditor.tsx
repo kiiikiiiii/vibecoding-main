@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNotes } from '../context/NotesContext';
+import { Note } from '../types/note';
+import { TagInput } from './TagInput';
 
 interface NoteEditorProps {
   selectedNoteId: string | null;
@@ -11,18 +13,24 @@ export function NoteEditor({ selectedNoteId, isCreating, onDone }: NoteEditorPro
   const { notes, addNote, editNote } = useNotes();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const selectedNote = notes.find((n) => n.id === selectedNoteId);
 
+  // 폼을 노트 값으로 채움 (노트가 없으면 비움)
+  const syncForm = (note?: Note) => {
+    setTitle(note?.title ?? '');
+    setContent(note?.content ?? '');
+    setTags(note?.tags ?? []);
+  };
+
   // 선택된 노트가 바뀔 때 폼 동기화
   useEffect(() => {
     if (selectedNote) {
-      setTitle(selectedNote.title);
-      setContent(selectedNote.content);
+      syncForm(selectedNote);
     } else if (isCreating) {
-      setTitle('');
-      setContent('');
+      syncForm();
     }
   }, [selectedNoteId, isCreating]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -35,9 +43,9 @@ export function NoteEditor({ selectedNoteId, isCreating, onDone }: NoteEditorPro
     setSaving(true);
     try {
       if (isCreating) {
-        await addNote(title, content);
+        await addNote(title, content, tags);
       } else if (selectedNoteId) {
-        await editNote(selectedNoteId, { title, content });
+        await editNote(selectedNoteId, { title, content, tags });
       }
       onDone();
     } catch (e) {
@@ -48,15 +56,19 @@ export function NoteEditor({ selectedNoteId, isCreating, onDone }: NoteEditorPro
     }
   };
 
+  const handleCancel = () => {
+    // 편집 중 취소하면 저장된 값으로 되돌림
+    if (!isCreating && selectedNote) syncForm(selectedNote);
+    onDone();
+  };
+
   // 아무것도 선택 안 된 상태
   if (!isCreating && !selectedNoteId) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center space-y-3">
           <p className="text-5xl">📝</p>
-          <p className="text-muted-foreground text-sm">
-            노트를 선택하거나 새 노트를 만드세요
-          </p>
+          <p className="text-muted-foreground text-sm">노트를 선택하거나 새 노트를 만드세요</p>
         </div>
       </div>
     );
@@ -81,6 +93,9 @@ export function NoteEditor({ selectedNoteId, isCreating, onDone }: NoteEditorPro
       {/* 구분선 */}
       <div className="h-px bg-border mb-4" />
 
+      {/* 태그 입력 (노트가 바뀌면 입력 중인 텍스트 초기화) */}
+      <TagInput key={selectedNoteId ?? 'new'} tags={tags} onChange={setTags} />
+
       {/* 내용 입력 */}
       <textarea
         value={content}
@@ -100,7 +115,7 @@ export function NoteEditor({ selectedNoteId, isCreating, onDone }: NoteEditorPro
           {saving ? '저장 중...' : '저장'}
         </button>
         <button
-          onClick={onDone}
+          onClick={handleCancel}
           className="px-5 py-2 rounded-xl text-sm font-semibold text-muted-foreground bg-muted hover:bg-border transition-colors cursor-pointer"
         >
           취소

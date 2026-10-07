@@ -5,7 +5,9 @@ const API_URL = 'http://localhost:3001';
 export async function fetchNotes(): Promise<Note[]> {
   const res = await fetch(`${API_URL}/notes`);
   if (!res.ok) throw new Error('Failed to fetch notes');
-  return res.json();
+  const notes: Note[] = await res.json();
+  // tags 필드가 없는 기존 데이터 보정
+  return notes.map((note) => ({ ...note, tags: note.tags ?? [] }));
 }
 
 export async function createNote(
